@@ -1,5 +1,4 @@
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 import joblib
 
 books_path = "Books.csv"
