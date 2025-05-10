@@ -20,9 +20,11 @@ books['ISBN'] = books['ISBN'].astype(str)
 data = ratings.merge(books, on='ISBN').merge(users, on='User-ID')
 data = data.rename(columns={'Book-Rating': 'Rating', 'Year-Of-Publication': 'Year', 'Age': 'Age', 'Book-Title': 'Title'})
 data = data[data['Rating'] > 0]
+
 data['Year'] = pd.to_numeric(data['Year'], errors='coerce')
 data['Age'] = pd.to_numeric(data['Age'], errors='coerce')
 data = data.dropna(subset=['Year', 'Age', 'Rating'])
+data = data[(data['Age'] >= 5) & (data['Age'] <= 110)]
 
 X = data[['Year', 'Age']]
 y = data['Rating']
