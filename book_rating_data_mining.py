@@ -28,7 +28,7 @@ data = data[data['Rating'] > 0]
 data['Year'] = pd.to_numeric(data['Year'], errors='coerce')
 data['Age'] = pd.to_numeric(data['Age'], errors='coerce')
 data = data.dropna(subset=['Year', 'Age', 'Rating'])
-
+data = data[(data['Age'] >= 5) & (data['Age'] <= 110)]
 # === 📊 EDA ===
 plt.figure(figsize=(8, 4))
 sns.histplot(data['Age'], bins=30, kde=True)
