@@ -1,47 +1,67 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
 import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import (
+    mean_squared_error, mean_absolute_error,
+    r2_score, mean_absolute_percentage_error
+)
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-books_path = "Books.csv"
-users_path = "Users.csv"
-ratings_path = "Ratings.csv"
+def scale_tfidf(x):
+    return x * 2.0
 
-books = pd.read_csv(books_path, delimiter=';', encoding='latin-1', on_bad_lines='skip')
-users = pd.read_csv(users_path, delimiter=';', encoding='latin-1', on_bad_lines='skip', low_memory=False)
-ratings = pd.read_csv(ratings_path, delimiter=';', encoding='latin-1', on_bad_lines='skip')
+def train_and_evaluate(data_path="data_merged.csv"):
+    df = pd.read_csv(data_path)
+    df = df[['Age', 'BookAge', 'Title', 'Author', 'Publisher', 'Rating']].dropna()
+    X = df[['Age', 'BookAge', 'Title', 'Author', 'Publisher']]
+    y = df['Rating']
 
-ratings['User-ID'] = ratings['User-ID'].astype(str)
-users['User-ID'] = users['User-ID'].astype(str)
-ratings['ISBN'] = ratings['ISBN'].astype(str)
-books['ISBN'] = books['ISBN'].astype(str)
+    top_authors = X['Author'].value_counts().nlargest(30).index
+    top_publishers = X['Publisher'].value_counts().nlargest(30).index
+    X.loc[:, 'Author'] = X['Author'].apply(lambda a: a if a in top_authors else 'Other')
+    X.loc[:, 'Publisher'] = X['Publisher'].apply(lambda p: p if p in top_publishers else 'Other')
 
-data = ratings.merge(books, on='ISBN').merge(users, on='User-ID')
-data = data.rename(columns={'Book-Rating': 'Rating', 'Year-Of-Publication': 'Year', 'Age': 'Age', 'Book-Title': 'Title'})
-data = data[data['Rating'] > 0]
+    column_transformer = ColumnTransformer(transformers=[
+        ('tfidf_title', Pipeline([
+            ('tfidf', TfidfVectorizer(max_features=500, stop_words='english')),
+            ('scale', FunctionTransformer(scale_tfidf, validate=False))
+        ]), 'Title'),
+        ('author', OneHotEncoder(handle_unknown='ignore'), ['Author']),
+        ('publisher', OneHotEncoder(handle_unknown='ignore'), ['Publisher']),
+        ('num', StandardScaler(), ['Age', 'BookAge'])
+    ])
 
-data['Year'] = pd.to_numeric(data['Year'], errors='coerce')
-data['Age'] = pd.to_numeric(data['Age'], errors='coerce')
-data = data.dropna(subset=['Year', 'Age', 'Rating'])
-data = data[(data['Age'] >= 5) & (data['Age'] <= 110)]
+    pipeline = Pipeline([
+        ('transform', column_transformer),
+        ('model', LinearRegression())
+    ])
 
-X = data[['Year', 'Age']]
-y = data['Rating']
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    pipeline.fit(x_train, y_train)
+    y_pred = pipeline.predict(x_test)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    print("RMSE:", mean_squared_error(y_test, y_pred) ** 0.5)
+    print("MAE:", mean_absolute_error(y_test, y_pred))
+    print("R²:", r2_score(y_test, y_pred))
+    print("MAPE:", mean_absolute_percentage_error(y_test, y_pred))
+    print("CV RMSE:", -cross_val_score(pipeline, X, y, cv=5, scoring='neg_root_mean_squared_error').mean())
 
-model = LinearRegression()
-model.fit(X_train, y_train)
+    plt.figure()
+    sns.regplot(x=y_test, y=y_pred, line_kws={"color": "red"})
+    plt.xlabel("Actual Rating")
+    plt.ylabel("Predicted Rating")
+    plt.title("Actual vs Predicted Ratings")
+    plt.tight_layout()
+    plt.show()
 
-y_pred = model.predict(X_test)
-print(f"RMSE: {mean_squared_error(y_test, y_pred) ** 0.5:.2f}")
-print(f"R² Score: {r2_score(y_test, y_pred):.2f}")
+    joblib.dump(pipeline, "linear_model.pkl")
+    print("Model saved as linear_model.pkl")
 
-a = model.coef_[0]
-b = model.coef_[1]
-c = model.intercept_
-print(f"Predicted Rating = {a:.4f} * Year + {b:.4f} * Age + {c:.4f}")
-
-joblib.dump(model, "trained_model.pkl")
-print("Model saved")
+if __name__ == "__main__":
+    train_and_evaluate()
