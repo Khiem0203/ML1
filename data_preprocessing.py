@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime
 import os
+from sklearn.model_selection import train_test_split
 
 def clean_column_names(df):
     df.columns = df.columns.str.strip().str.replace('\ufeff', '')
@@ -34,8 +35,17 @@ def run_preprocessing(books_path, users_path, ratings_path, save_path="data_merg
     data['Liked'] = (data['Rating'] >= 7).astype(int)
     data['BookAge'] = datetime.now().year - data['Year']
 
-    data.to_csv(save_path, index=False)
-    print(f"Data saved to {save_path}")
+    full_path = save_path
+    data.to_csv(full_path, index=False)
+    print(f"Data saved to {full_path}")
+
+    train_df, test_df = train_test_split(data, test_size=0.2, random_state=42)
+
+    train_df.to_csv("train.csv", index=False)
+    test_df.to_csv("test.csv", index=False)
+
+    print(f"Train set: {len(train_df)} books")
+    print(f"Test set: {len(test_df)} books")
 
 if __name__ == "__main__":
     run_preprocessing("Books.csv", "Users.csv", "Ratings.csv")

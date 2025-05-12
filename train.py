@@ -16,7 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 def scale_tfidf(x):
     return x * 2.0
 
-def train_and_evaluate(data_path="data_merged.csv"):
+def train_and_evaluate(data_path="train.csv"):
     df = pd.read_csv(data_path)
     df = df[['Age', 'BookAge', 'Title', 'Author', 'Publisher', 'Rating']].dropna()
     X = df[['Age', 'BookAge', 'Title', 'Author', 'Publisher']]
